@@ -8,11 +8,13 @@ import {
   ShieldCheckIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
+import { useTranslation } from "../../context/TranslationContext";
 import dotenv from "dotenv";
 dotenv.config();
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 function Settings() {
+  const { t, changeLanguage, language } = useTranslation();
   const [user, setUser] = useState(null);
   const [settings, setSettings] = useState({
     // Notification Settings
@@ -65,9 +67,12 @@ function Settings() {
         setUser(userData.user);
 
         // Load user-specific settings if they exist
-        const savedSettings = localStorage.getItem(`userSettings_${userData.user.id}`);
+        const savedSettings = localStorage.getItem(`userSettings_${userData.user._id}`);
         if (savedSettings) {
-          setSettings(JSON.parse(savedSettings));
+          const parsedSettings = JSON.parse(savedSettings);
+          setSettings(parsedSettings);
+          // Update the language in the translation context
+          changeLanguage(parsedSettings.language);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -85,22 +90,23 @@ function Settings() {
   const handleSettingChange = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
+    
+    // If language is changed, update the translation context
+    if (key === 'language') {
+      changeLanguage(value);
+    }
+    
     // Store settings with user ID to keep multiple users' settings separate
     localStorage.setItem(
-      `userSettings_${user?.id || 'default'}`,
+      `userSettings_${user?._id || 'default'}`,
       JSON.stringify(newSettings)
     );
   };
 
   const languages = [
     { code: "en", name: "English" },
-    { code: "es", name: "Spanish" },
     { code: "fr", name: "French" },
-    { code: "de", name: "German" },
-    { code: "it", name: "Italian" },
-    { code: "pt", name: "Portuguese" },
-    { code: "nl", name: "Dutch" },
-    { code: "pl", name: "Polish" },
+    { code: "zh", name: "Chinese (Simplified)" },
   ];
 
   const SettingsSection = ({ title, icon: Icon, children }) => (
@@ -142,46 +148,46 @@ function Settings() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Notification Settings */}
-        <SettingsSection title="Notifications" icon={BellIcon}>
+        <SettingsSection title={t('notificationSettings')} icon={BellIcon}>
           <ToggleOption
-            title="Email Notifications"
-            description="Receive email updates about your progress"
+            title={t('emailNotifications')}
+            description={t('emailNotificationsDesc')}
             value={settings.emailNotifications}
             onChange={(value) =>
               handleSettingChange("emailNotifications", value)
             }
           />
           <ToggleOption
-            title="Push Notifications"
-            description="Get push notifications for important updates"
+            title={t('pushNotifications')}
+            description={t('pushNotificationsDesc')}
             value={settings.pushNotifications}
             onChange={(value) =>
               handleSettingChange("pushNotifications", value)
             }
           />
           <ToggleOption
-            title="Workout Reminders"
-            description="Get reminded about your scheduled workouts"
+            title={t('workoutReminders')}
+            description={t('workoutRemindersDesc')}
             value={settings.workoutReminders}
             onChange={(value) => handleSettingChange("workoutReminders", value)}
           />
           <ToggleOption
-            title="Progress Updates"
-            description="Receive weekly progress reports"
+            title={t('progressUpdates')}
+            description={t('progressUpdatesDesc')}
             value={settings.progressUpdates}
             onChange={(value) => handleSettingChange("progressUpdates", value)}
           />
         </SettingsSection>
 
         {/* Regional Settings */}
-        <SettingsSection title="Regional Settings" icon={GlobeAltIcon}>
+        <SettingsSection title={t('regionalSettings')} icon={GlobeAltIcon}>
           <div className="space-y-4">
             <div className="space-y-2">
               <label
                 htmlFor="language"
                 className="block text-lg font-medium text-white"
               >
-                Language
+                {t('language')}
               </label>
               <select
                 id="language"
@@ -201,10 +207,26 @@ function Settings() {
 
             <div className="space-y-2">
               <label
+                htmlFor="timezone"
+                className="block text-lg font-medium text-white"
+              >
+                {t('timezone')}
+              </label>
+              <input
+                type="text"
+                id="timezone"
+                value={settings.timezone}
+                readOnly
+                className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
                 htmlFor="measurementUnit"
                 className="block text-lg font-medium text-white"
               >
-                Measurement Unit
+                {t('measurementUnit')}
               </label>
               <select
                 id="measurementUnit"
@@ -214,22 +236,43 @@ function Settings() {
                 }
                 className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="metric">Metric (kg, km)</option>
-                <option value="imperial">Imperial (lb, mi)</option>
+                <option value="metric">{t('metric')}</option>
+                <option value="imperial">{t('imperial')}</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="dateFormat"
+                className="block text-lg font-medium text-white"
+              >
+                {t('dateFormat')}
+              </label>
+              <select
+                id="dateFormat"
+                value={settings.dateFormat}
+                onChange={(e) =>
+                  handleSettingChange("dateFormat", e.target.value)
+                }
+                className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
               </select>
             </div>
           </div>
         </SettingsSection>
 
         {/* Privacy Settings */}
-        <SettingsSection title="Privacy & Security" icon={ShieldCheckIcon}>
+        <SettingsSection title={t('privacySettings')} icon={ShieldCheckIcon}>
           <div className="space-y-4">
             <div className="space-y-2">
               <label
                 htmlFor="profileVisibility"
                 className="block text-lg font-medium text-white"
               >
-                Profile Visibility
+                {t('profileVisibility')}
               </label>
               <select
                 id="profileVisibility"
@@ -239,47 +282,120 @@ function Settings() {
                 }
                 className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="public">Public</option>
-                <option value="friends">Friends Only</option>
-                <option value="private">Private</option>
+                <option value="public">{t('public')}</option>
+                <option value="friends">{t('friends')}</option>
+                <option value="private">{t('private')}</option>
               </select>
             </div>
+
             <ToggleOption
-              title="Share Progress"
+              title={t('shareProgress')}
               description="Allow others to see your fitness progress"
               value={settings.shareProgress}
               onChange={(value) => handleSettingChange("shareProgress", value)}
             />
+
+            <ToggleOption
+              title={t('shareWorkouts')}
+              description="Share your workout routines with the community"
+              value={settings.shareWorkouts}
+              onChange={(value) => handleSettingChange("shareWorkouts", value)}
+            />
           </div>
         </SettingsSection>
 
-        {/* Account Settings */}
-        <SettingsSection title="Account" icon={UserIcon}>
+        {/* Appearance Settings */}
+        <SettingsSection title={t('appearanceSettings')} icon={UserIcon}>
+          <ToggleOption
+            title={t('darkMode')}
+            description="Use dark theme throughout the app"
+            value={settings.darkMode}
+            onChange={(value) => handleSettingChange("darkMode", value)}
+          />
+
+          <ToggleOption
+            title={t('compactView')}
+            description="Display more content with less spacing"
+            value={settings.compactView}
+            onChange={(value) => handleSettingChange("compactView", value)}
+          />
+
+          <ToggleOption
+            title={t('animationsEnabled')}
+            description="Enable animations and transitions"
+            value={settings.animationsEnabled}
+            onChange={(value) =>
+              handleSettingChange("animationsEnabled", value)
+            }
+          />
+        </SettingsSection>
+
+        {/* Workout Settings */}
+        <SettingsSection title={t('workoutSettings')} icon={UserIcon}>
           <div className="space-y-4">
-            <button
-              className="w-full px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all duration-200"
-              onClick={() => {
-                // Implement password change logic
-              }}
-            >
-              Change Password
-            </button>
-            <button
-              className="w-full px-4 py-2 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-900/10 rounded-xl transition-all duration-200"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Are you sure you want to delete your account? This action cannot be undone.",
-                  )
-                ) {
-                  // Add account deletion API call here
+            <div className="space-y-2">
+              <label
+                htmlFor="workoutDifficulty"
+                className="block text-lg font-medium text-white"
+              >
+                {t('workoutDifficulty')}
+              </label>
+              <select
+                id="workoutDifficulty"
+                value={settings.workoutDifficulty}
+                onChange={(e) =>
+                  handleSettingChange("workoutDifficulty", e.target.value)
                 }
-              }}
-            >
-              Delete Account
-            </button>
+                className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="beginner">{t('beginner')}</option>
+                <option value="intermediate">{t('intermediate')}</option>
+                <option value="advanced">{t('advanced')}</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="workoutRemindersTime"
+                className="block text-lg font-medium text-white"
+              >
+                {t('workoutRemindersTime')}
+              </label>
+              <input
+                type="time"
+                id="workoutRemindersTime"
+                value={settings.workoutRemindersTime}
+                onChange={(e) =>
+                  handleSettingChange("workoutRemindersTime", e.target.value)
+                }
+                className="mt-1 block w-full rounded-md bg-[#1E1B29] border border-purple-900/20 text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <ToggleOption
+              title={t('restDayNotifications')}
+              description="Get notifications on rest days"
+              value={settings.restDayNotifications}
+              onChange={(value) =>
+                handleSettingChange("restDayNotifications", value)
+              }
+            />
           </div>
         </SettingsSection>
+
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <button
+            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl shadow-lg hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transform transition-all duration-200 hover:scale-105"
+            onClick={() => {
+              // Save settings to backend (if needed)
+              // For now, we're just saving to localStorage
+              alert(t('settingsSaved'));
+            }}
+          >
+            {t('saveChanges')}
+          </button>
+        </div>
       </div>
     </DashboardLayout>
   );
