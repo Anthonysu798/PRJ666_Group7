@@ -29,7 +29,7 @@ export const signup = async (req, res) => {
             password, // Don't hash here - let the pre-save middleware handle it
             name,
             subscription: {
-                plan: "free",
+                plan: "basic",
                 status: "inactive",
             },
         });
@@ -145,7 +145,7 @@ export const googleAuth = async (req, res) => {
                 name,
                 profileImage: picture,
                 googleId,
-                subscription: { plan: "free", status: "inactive" },
+                subscription: { plan: "basic", status: "inactive" },
                 // Don't set password for Google users
             });
             await user.save();

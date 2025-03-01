@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
     },
     googleId: {
         type: String, // To store the Google user ID
-        unique: true,
+        unique: true, // Ensures that each user has a unique Google ID
         sparse: true, // Allows null values while enforcing uniqueness
     },
     lastLogin: {
@@ -34,16 +34,26 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ["user", "pro-user", "admin"],
-        default: "user",
+        enum: ["basic-user", "standard-user", "premium-user", "admin"],
+        default: "basic-user",
     },
     subscription: {
-        stripeCustomerId: { type: String, default: null },
-        stripeSubscriptionId: { type: String, default: null },
-        status: { type: String, enum: ["active", "inactive"], default: "inactive" },
-        currentPeriodEnd: { type: Date, default: null },
-        plan: { type: String, enum: ["free", "pro"], default: "free" },
+        plan: {
+            type: String,
+            enum: ["basic", "standard", "premium"],
+            default: "basic"
+        },
+        status: {
+            type: String,
+            enum: ["active", "inactive", "incomplete", "incomplete_expired", "past_due", "canceled", "unpaid", "trialing"],
+            default: "inactive"
+        },
+        stripeCustomerId: String,
+        stripeSubscriptionId: String,
+        currentPeriodEnd: Date,
+        canceledAt: Date
     },
+    
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
 
@@ -75,12 +85,11 @@ const userSchema = new mongoose.Schema({
     },
     // Weekly workout Date
     weeklyWorkouts: {
-        type: Map, // Map of workout types to their completion status
-        of: new mongoose.Schema({ // Schema for each workout type
-            workoutType: String, // Type of workout (e.g., "Cardio", "Strength", "Flexibility")
-            duration: Number, // Duration of the workout in minutes
-        }, { _id: false }), // Disable _id field for each workout type
-        default: {}, // Default value is an empty map
+        type: [{ 
+            workoutType: String, 
+            duration: Number 
+        }],
+        default: []
     }
 }, { timestamps: true });
 
