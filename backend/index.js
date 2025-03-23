@@ -10,6 +10,9 @@ import publicRouter from './routes/public.route.js';
 import stripeRouter from './routes/stripe.route.js';
 import Stripe from 'stripe';
 import { User } from "./models/user.model.js";
+import dietRoutes from './routes/diet.route.js';
+import mongoose from 'mongoose';
+import workoutRoutes from "./routes/workout.routes.js";
 
 dotenv.config(); // Load environment variables
 
@@ -102,17 +105,28 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch((err) => console.error('MongoDB connection error:', err));
+
 // Routes
 app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
+app.use('/api/diet', dietRoutes); // Diet routes
 app.use("/api/auth", authRouter); // Auth routes
 app.use("/api/profile", profileRouter); // Profile routes
 app.use('/api/ai', aiRoutes);   // AI routes
 app.use('/api/user', userStatsRoutes); // User stats routes
 app.use('/api/public', publicRouter);
 app.use('/api/stripe', stripeRouter); // Stripe routes
+app.use("/api/workout", workoutRoutes); // Workout routes
+
 
 // Start server
 const PORT = process.env.PORT || 4000;
