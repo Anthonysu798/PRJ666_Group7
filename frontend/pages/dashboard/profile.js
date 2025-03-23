@@ -3,6 +3,7 @@ import DashboardLayout from "../../components/DashboardLayout";
 import { withAuth } from "../../middleware/authMiddleware";
 import Image from "next/image";
 import dotenv from "dotenv";
+import { Crown, Check } from "lucide-react";
 dotenv.config();
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -306,15 +307,25 @@ function Profile() {
     }
   };
 
-  const getPlanBadgeStyle = (plan) => {
-    switch (plan?.toLowerCase()) {
-      case "premium":
-        return "bg-gradient-to-r from-yellow-400/10 to-yellow-600/10 text-yellow-400 border border-yellow-400/20";
-      case "pro":
-        return "bg-gradient-to-r from-purple-400/10 to-violet-600/10 text-purple-400 border border-purple-400/20";
-      default:
-        return "bg-gradient-to-r from-gray-400/10 to-gray-600/10 text-gray-400 border border-gray-400/20";
-    }
+  const getPlanDetails = (planName) => {
+    const plans = {
+      basic: {
+        name: "Basic",
+        badge: "bg-gradient-to-r from-gray-400/10 to-gray-600/10 text-gray-400 border-gray-400/20",
+        features: ["Basic workouts", "Basic meal tracking"]
+      },
+      standard: {
+        name: "Standard",
+        badge: "bg-gradient-to-r from-purple-400/10 to-violet-600/10 text-purple-400 border-purple-400/20",
+        features: ["Custom workout plans", "AI meal suggestions", "Progress tracking"]
+      },
+      premium: {
+        name: "Premium",
+        badge: "bg-gradient-to-r from-yellow-400/10 to-yellow-600/10 text-yellow-400 border-yellow-400/20",
+        features: ["Personal trainer consultation", "Advanced analytics", "Priority support"]
+      }
+    };
+    return plans[planName] || plans.basic;
   };
 
   const ProfileSkeleton = () => (
@@ -442,25 +453,25 @@ function Profile() {
                       <p className="text-purple-200/80">{user?.email}</p>
                       {/* Add Subscription Plan Badge */}
                       <div className="mt-2 mb-4">
-                        <span
-                          className={`
-                                                    inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                                                    ${getPlanBadgeStyle(user?.plan)}
-                                                `}
-                        >
-                          <svg
-                            className="w-4 h-4 mr-1.5"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          {`${user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : "Basic"} Plan`}
-                        </span>
+                        {user?.plan && (
+                          <div className="flex flex-col gap-2">
+                            <span className={`
+                              inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium
+                              ${getPlanDetails(user.plan.toLowerCase()).badge}
+                            `}>
+                              <Crown className="w-4 h-4 mr-1.5" />
+                              {getPlanDetails(user.plan.toLowerCase()).name} Plan
+                            </span>
+                            <div className="text-sm text-gray-400">
+                              {getPlanDetails(user.plan.toLowerCase()).features.map((feature, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <Check className="w-4 h-4 text-green-400" />
+                                  {feature}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="mt-4 flex gap-4">
                         <button
