@@ -1,38 +1,9 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useEffect } from 'react';
-import { LayoutGrid } from "@/components/ui/layout-grid";
 
 
 export default function Home() {
-  const router = useRouter();
-
-  // Add cards data
-  const cards = [
-    {
-      id: 1,
-      content: "Start Your Fitness Journey",
-      className: "md:col-span-2",
-      thumbnail: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?ixlib=rb-4.0.3"
-    },
-    {
-      id: 2,
-      content: "Personalized Workouts",
-      className: "col-span-1",
-      thumbnail: "https://images.unsplash.com/photo-1594737625785-a6cbdabd333c?ixlib=rb-4.0.3"
-    },
-    {
-      id: 3,
-      content: "Track Your Progress",
-      className: "col-span-1",
-      thumbnail: "https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?ixlib=rb-4.0.3"
-    }
-  ];
-
-  useEffect(() => {
-    // Add CSS variable for background color
-    document.documentElement.style.setProperty('--bg-color', '#0A0A0F');
-  }, []);
 
   return (
     <div className="min-h-screen relative" style={{ 
@@ -72,7 +43,6 @@ export default function Home() {
           </div>
         </div>
       </nav>
-      <LayoutGrid cards={cards} />
     </div>
   );
 }
