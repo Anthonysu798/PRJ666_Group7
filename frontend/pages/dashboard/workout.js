@@ -34,7 +34,9 @@ import { getWorkoutMetrics } from "@/utils/workoutHelpers";
 import { MUSCLE_GROUPS, INTENSITY_LEVELS } from '@/utils/workoutConstants';
 import WorkoutSessionModal from "@/components/workout/WorkoutSessionModal";
 import AIWorkoutForm from '@/components/workout/AIWorkoutForm';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 function Workout() {
@@ -317,7 +319,7 @@ function Workout() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ***REMOVED***`
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
           model: "gpt-4-turbo-preview",
