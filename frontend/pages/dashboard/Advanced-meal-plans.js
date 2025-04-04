@@ -1,0 +1,726 @@
+import DashboardLayout from "../../components/DashboardLayout";
+import { withAuth } from "../../middleware/authMiddleware";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Sparkles, 
+  Filter, 
+  Plus, 
+  ChevronRight, 
+  Leaf, 
+  Beef, 
+  Fish,
+  Apple,
+  Scale,
+  Brain,
+  X,
+  Edit3,
+  Check,
+  Heart,
+  ArrowUpRight
+} from "lucide-react";
+import CustomPlanForm from "@/components/diet/CustomPlanForm";
+import PlanDetailsModal from "@/components/diet/PlanDetailsModal";
+import { useRouter } from "next/router";
+import dotenv from "dotenv";
+import { PLAN_FEATURES } from "../../utils/planUtils";
+import { CUSTOM_DIET_IMAGES } from "@/utils/dietImages";
+import Toast from "@/components/ui/Toast";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import AIDietPlanForm from "@/components/diet/AIDietPlanForm";
+dotenv.config();
+
+// Add this line to define apiUrl
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+function Diet() {
+  const [activeTab, setActiveTab] = useState("preset");
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [presetPlans, setPresetPlans] = useState([]);
+  const [customPlans, setCustomPlans] = useState([]);
+  const [userPlan, setUserPlan] = useState('basic');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const router = useRouter();
+  const [activePlanId, setActivePlanId] = useState(null);
+  const [showAIForm, setShowAIForm] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Add these state variables
+  const [customPlan, setCustomPlan] = useState({
+    name: '',
+    goalType: '',
+    activityLevel: '',
+    targetCalories: 2000,
+    dietaryRestrictions: []
+  });
+
+  const filterButtons = [
+    { id: "all", label: "All Plans", icon: Scale },
+    { id: "muscle", label: "Muscle Gain", icon: Beef },
+    { id: "weight-loss", label: "Weight Loss", icon: ChevronRight },
+    { id: "keto", label: "Keto", icon: Brain },
+    { id: "vegan", label: "Vegan", icon: Leaf },
+    { id: "performance", label: "Performance", icon: Sparkles },
+    { id: "health", label: "Wellness", icon: Heart },
+    { id: "gluten-free", label: "Gluten Free", icon: Apple }
+  ];
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error('No token found');
+        }
+
+        const response = await fetch(`${apiUrl}/api/profile/getUserProfile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+
+        const data = await response.json();
+        // Debug log to check the user plan
+        console.log('User profile data:', data.user);
+        console.log('User plan:', data.user.plan);
+
+        // Make sure to handle the plan case-insensitively
+        const userPlanType = data.user.plan?.toLowerCase() || 'basic';
+        setUserPlan(userPlanType);
+        
+        // Debug log to verify the state update
+        console.log('Set user plan to:', userPlanType);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        setUserPlan('basic');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch preset plans
+        const presetResponse = await fetch(`${apiUrl}/api/diet/preset`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        // Fetch user plans (including custom plans)
+        const userPlansResponse = await fetch(`${apiUrl}/api/diet/user-plans`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        if (!presetResponse.ok || !userPlansResponse.ok) {
+          throw new Error('Failed to fetch plans');
+        }
+
+        const presetData = await presetResponse.json();
+        const userPlansData = await userPlansResponse.json();
+
+        // Get the active plan
+        const activePlan = userPlansData.activePlan;
+
+        // Set preset plans with proper active state
+        const updatedPresetPlans = presetData.plans.map(plan => ({
+          ...plan,
+          isActive: activePlan ? 
+            (plan.name === activePlan.name && plan.category === activePlan.category) : 
+            false
+        }));
+
+        // Set custom plans with proper active state
+        const updatedCustomPlans = userPlansData.customPlans?.map(plan => ({
+          ...plan,
+          isActive: activePlan ? plan._id === activePlan._id : false
+        })) || [];
+
+        setPresetPlans(updatedPresetPlans);
+        setCustomPlans(updatedCustomPlans);
+
+        // Only set current plan if there is an active plan
+        if (activePlan) {
+          setActivePlanId(activePlan._id);
+          setCurrentPlan(activePlan);
+        } else {
+          setActivePlanId(null);
+          setCurrentPlan(null);
+        }
+
+      } catch (error) {
+        console.error("Error fetching plans:", error);
+        setError(error.message || "Failed to load diet plans");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (localStorage.getItem("token")) {
+      fetchPlans();
+    }
+  }, [apiUrl]);
+
+  const getRandomImage = (usedImages) => {
+    const availableImages = CUSTOM_DIET_IMAGES.filter(img => !usedImages.includes(img));
+    if (availableImages.length === 0) return CUSTOM_DIET_IMAGES[0];
+    return availableImages[Math.floor(Math.random() * availableImages.length)];
+  };
+
+  const handleCustomPlanSubmit = async (planData) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/diet/custom`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(planData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create custom plan');
+      }
+
+      const { plan } = await response.json();
+
+      // Update custom plans state
+      setCustomPlans(prevPlans => [...prevPlans, {
+        ...plan,
+        isCustom: true,
+        image: plan.image || getRandomImage(plan.tags)
+      }]);
+
+      setToastMessage("Custom diet plan created successfully!");
+      setShowToast(true);
+      setShowCustomForm(false);
+    } catch (error) {
+      console.error('Error creating custom plan:', error);
+      setToastMessage(error.message || "Failed to create custom plan");
+      setShowToast(true);
+    }
+  };
+
+  const handleViewPlan = (plan) => {
+    setSelectedPlan(plan);
+  };
+
+  const handleSetActivePlan = async (plan) => {
+    try {
+      const isPreset = !plan._id; // Preset plans don't have MongoDB _id
+
+      const response = await fetch(`${apiUrl}/api/diet/active`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ 
+          planId: plan._id,
+          isPreset: isPreset,
+          presetPlan: isPreset ? plan : undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to set active plan');
+      }
+
+      const data = await response.json();
+      const savedPlan = data.plan;
+
+      // Update local state with the saved plan from the response
+      setActivePlanId(savedPlan._id);
+      setCurrentPlan(savedPlan);
+      
+      // Update both preset and custom plans lists
+      if (plan.isCustom) {
+        setCustomPlans(prev => prev.map(p => ({
+          ...p,
+          isActive: p._id === savedPlan._id,
+          // Update the plan data if it's the one that was modified
+          ...(p._id === savedPlan._id ? savedPlan : {})
+        })));
+      } else {
+        setPresetPlans(prev => prev.map(p => ({
+          ...p,
+          isActive: savedPlan.name === p.name && savedPlan.category === p.category,
+          _id: savedPlan.name === p.name && savedPlan.category === p.category ? savedPlan._id : p._id,
+          // Update the plan data if it's the one that was modified
+          ...(p.name === savedPlan.name && p.category === savedPlan.category ? savedPlan : {})
+        })));
+      }
+
+      setToastMessage("Plan updated successfully!");
+      setShowToast(true);
+    } catch (error) {
+      console.error("Error updating plan:", error);
+      setError(error.message || "Failed to update plan");
+    }
+  };
+
+  // Combine preset and custom plans
+  const allPlans = [...presetPlans, ...customPlans];
+
+  // Filter plans based on selected filter
+  const filteredPlans = allPlans.filter(plan => 
+    selectedFilter === "all" ? true : plan.category === selectedFilter
+  );
+
+  const handleGeneratePlan = () => {
+    // Debug log to check plan status when button is clicked
+    console.log('Current user plan when generating:', userPlan);
+    
+    if (!['premium', 'standard'].includes(userPlan.toLowerCase())) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    setShowAIForm(true);
+  };
+
+  const handleAIDietPlanSubmit = async (formData) => {
+    try {
+      setIsGeneratingAI(true);
+      const token = localStorage.getItem("token");
+      
+      // Format the request data
+      const requestData = {
+        ...formData,
+        targetCalories: Number(formData.targetCalories),
+        userPlan: userPlan
+      };
+      
+      const response = await fetch(`${apiUrl}/api/diet/ai-generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate AI diet plan');
+      }
+
+      // Update custom plans state with the new AI-generated plan
+      setCustomPlans(prevPlans => [
+        ...prevPlans,
+        {
+          ...data.plan,
+          isCustom: true,
+          type: 'ai-generated',
+          image: data.plan.image || getRandomImage(data.plan.category)
+        }
+      ]);
+
+      setToastMessage("AI diet plan generated successfully!");
+      setShowToast(true);
+      setShowAIForm(false);
+    } catch (error) {
+      console.error('Error details:', {
+        message: error.message,
+        apiUrl,
+        userPlan
+      });
+      setError(error.message);
+      setShowToast(true);
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const UpgradeModal = () => (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#1E1B29] rounded-xl p-6 max-w-md w-full">
+        <h3 className="text-xl font-bold text-white mb-4">
+          Upgrade Required
+        </h3>
+        <p className="text-gray-400 mb-6">
+          This feature requires a Standard or Premium subscription. Upgrade your plan to access AI-generated diet plans.
+        </p>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowUpgradeModal(false)}
+            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              // Add your upgrade navigation logic here
+              window.location.href = '/pricing';
+            }}
+            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 
+                     rounded-lg text-white font-medium hover:opacity-90 transition-opacity"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const PlanCard = ({ plan }) => {
+    const isCurrentPlan = currentPlan && (
+        plan._id === currentPlan._id || 
+        (plan.name === currentPlan.name && plan.category === currentPlan.category)
+    );
+
+    return (
+        <button 
+            onClick={() => handleViewPlan(plan)}
+            className={`w-full px-4 py-3 rounded-lg font-medium
+                       flex items-center justify-center gap-2 transition-all duration-200
+                       ${isCurrentPlan
+                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                         : 'bg-purple-600/10 text-purple-400 hover:bg-purple-600 hover:text-white'
+                       }`}
+        >
+            {isCurrentPlan ? (
+                <>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Current Plan
+                </>
+            ) : (
+                <>
+                    View Plan
+                    <ChevronRight className="w-4 h-4" />
+                </>
+            )}
+        </button>
+    );
+  };
+
+  // Add this debug display in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Current user plan:', userPlan);
+  }
+
+  if (isLoading) {
+    return <DashboardLayout>
+      <div className="p-6">
+        <div className="animate-pulse">
+          {/* Add loading skeleton here */}
+          <div className="h-8 w-48 bg-purple-500/10 rounded-lg mb-4"></div>
+          <div className="h-4 w-96 bg-purple-500/10 rounded-lg"></div>
+        </div>
+      </div>
+    </DashboardLayout>;
+  }
+
+  return (
+    <ErrorBoundary>
+      <DashboardLayout>
+        <div className="space-y-6 p-6">
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-300 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                Nutrition Plans
+              </h1>
+              <p className="text-gray-400 mt-2">
+                Customize your meal plans to achieve your fitness goals
+              </p>
+            </div>
+            
+            {/* AI Generate Button */}
+            <button
+              onClick={handleGeneratePlan}
+              className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2
+                ${userPlan === 'basic' 
+                  ? 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:opacity-90' 
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90'
+                } text-white transition-all`}
+            >
+              {userPlan === 'basic' ? (
+                <>
+                  Upgrade to Access AI Diet Plans
+                  <ArrowUpRight className="w-4 h-4" />
+                </>
+              ) : (
+                <>
+                  Generate AI Plan
+                  <Sparkles className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-4 border-b border-purple-900/20">
+            <button
+              onClick={() => setActiveTab("preset")}
+              className={`px-4 py-2 font-medium transition-all duration-200 ${
+                activeTab === "preset"
+                  ? "text-purple-400 border-b-2 border-purple-400"
+                  : "text-gray-400 hover:text-purple-400"
+              }`}
+            >
+              Preset Plans
+            </button>
+            <button
+              onClick={() => setActiveTab("custom")}
+              className={`px-4 py-2 font-medium transition-all duration-200 ${
+                activeTab === "custom"
+                  ? "text-purple-400 border-b-2 border-purple-400"
+                  : "text-gray-400 hover:text-purple-400"
+              }`}
+            >
+              Custom Plan
+            </button>
+          </div>
+
+          {activeTab === "custom" ? (
+            <div className="space-y-6">
+                <button
+                    onClick={() => setShowCustomForm(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-[#1E1B29] border border-purple-900/20 
+                             rounded-xl text-gray-400 font-medium hover:text-purple-400 hover:border-purple-500/30 
+                             transition-all duration-200"
+                >
+                    <Plus className="w-5 h-5" />
+                    Create New Custom Plan
+                </button>
+
+                {/* Display Custom Plans Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    {customPlans.map((plan) => (
+                        <motion.div
+                            key={plan._id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="bg-[#1E1B29] rounded-xl overflow-hidden border border-purple-900/20 flex flex-col"
+                        >
+                            <div className="relative h-48">
+                                <img
+                                    src={plan.image}
+                                    alt={plan.name}
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#1E1B29] to-transparent" />
+                                <div className="absolute top-2 right-2 px-2 py-1 bg-purple-500/20 
+                                             rounded-full text-xs text-purple-400 font-medium">
+                                    Custom Plan
+                                </div>
+                            </div>
+                            
+                            <div className="p-6 flex-1 flex flex-col">
+                                <h3 className="text-xl font-semibold text-white">
+                                    {plan.name}
+                                </h3>
+                                
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                    {plan.tags.map((tag, index) => (
+                                        <span
+                                            key={index}
+                                            className="px-3 py-1 bg-purple-500/10 text-purple-400 rounded-full text-sm"
+                                        >
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                                
+                                <p className="text-gray-400 text-sm mt-4">
+                                    {plan.description}
+                                </p>
+                                
+                                <div className="grid grid-cols-3 gap-4 py-4 mt-auto mb-4 border-t border-purple-900/20">
+                                    <div className="text-center">
+                                        <div className="text-gray-400 text-sm">Calories</div>
+                                        <div className="text-white font-semibold">{plan.calories}</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-gray-400 text-sm">Protein</div>
+                                        <div className="text-white font-semibold">{plan.protein}g</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-gray-400 text-sm">Carbs</div>
+                                        <div className="text-white font-semibold">{plan.carbs}g</div>
+                                    </div>
+                                </div>
+                                
+                                <PlanCard plan={plan} />
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+          ) : (
+            <>
+              {/* Filter Pills */}
+              <div className="flex flex-wrap gap-3">
+                {filterButtons.map((filter) => {
+                  const Icon = filter.icon;
+                  return (
+                    <button
+                      key={filter.id}
+                      onClick={() => setSelectedFilter(filter.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all duration-200 
+                        ${
+                          selectedFilter === filter.id
+                            ? "bg-purple-600 text-white shadow-lg shadow-purple-500/25"
+                            : "bg-[#1E1B29] text-gray-400 hover:bg-purple-600/10 hover:text-purple-400"
+                        }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {filter.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Diet Plans Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredPlans.map((plan) => (
+                  <motion.div
+                    key={plan.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="bg-[#1E1B29] rounded-xl overflow-hidden border border-purple-900/20 flex flex-col"
+                  >
+                    {plan.isCustom && (
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-purple-500/20 
+                                   rounded-full text-xs text-purple-400 font-medium z-10">
+                        Custom Plan
+                      </div>
+                    )}
+                    <div className="relative h-48">
+                      <img
+                        src={plan.image}
+                        alt={plan.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1E1B29] to-transparent" />
+                    </div>
+                    
+                    <div className="p-6 flex-1 flex flex-col">
+                      <h3 className="text-xl font-semibold text-white">
+                        {plan.name}
+                      </h3>
+                      
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {plan.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-purple-500/10 text-purple-400 rounded-full text-sm"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      <p className="text-gray-400 text-sm mt-4">
+                        {plan.description}
+                      </p>
+                      
+                      <div className="grid grid-cols-3 gap-4 py-4 mt-auto mb-4 border-t border-purple-900/20">
+                        <div className="text-center">
+                          <div className="text-gray-400 text-sm">Calories</div>
+                          <div className="text-white font-semibold">{plan.calories}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400 text-sm">Protein</div>
+                          <div className="text-white font-semibold">{plan.protein}g</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400 text-sm">Carbs</div>
+                          <div className="text-white font-semibold">{plan.carbs}g</div>
+                        </div>
+                      </div>
+                      
+                      <PlanCard plan={plan} />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {selectedPlan && (
+            <PlanDetailsModal
+              plan={selectedPlan}
+              onClose={() => setSelectedPlan(null)}
+              onSetCurrent={handleSetActivePlan}
+              isCurrentPlan={selectedPlan._id === currentPlan?._id || 
+                            (selectedPlan.name === currentPlan?.name && 
+                             selectedPlan.category === currentPlan?.category)}
+            />
+          )}
+          {showUpgradeModal && <UpgradeModal />}
+          {showToast && (
+            <Toast
+              message={toastMessage}
+              onClose={() => setShowToast(false)}
+            />
+          )}
+          {showAIForm && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 
+                        flex items-center justify-center p-4">
+              <AIDietPlanForm
+                onSubmit={handleAIDietPlanSubmit}
+                onClose={() => setShowAIForm(false)}
+                isGenerating={isGeneratingAI}
+              />
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Add Error notification */}
+        {error && (
+          <div className="fixed bottom-4 right-4 bg-red-500/10 border border-red-500/20 
+                        text-red-400 px-4 py-3 rounded-lg shadow-lg">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-4 p-1 hover:bg-red-500/10 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Custom Plan Form Modal */}
+        {showCustomForm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 
+                      flex items-center justify-center p-4">
+            <CustomPlanForm
+              onSubmit={handleCustomPlanSubmit}
+              onClose={() => setShowCustomForm(false)}
+              setCustomPlan={setCustomPlan}
+            />
+          </div>
+        )}
+      </DashboardLayout>
+    </ErrorBoundary>
+  );
+}
+
+export default withAuth(Diet);

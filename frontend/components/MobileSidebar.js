@@ -102,13 +102,10 @@ export default function MobileSidebar({ isOpen, onClose }) {
     ...(userPlan !== "basic" ? [
       { name: t('advancedMealPlans'), icon: ClipboardDocumentListIcon, href: "/dashboard/Advanced-meal-plans" },
       { name: t('aiRecommendations'), icon: LightBulbIcon, href: "/dashboard/recommendations" },
-      { name: t('progressTracking'), icon: ChartBarIcon, href: "/dashboard/tracking" },
       { name: t('community'), icon: UsersIcon, href: "/dashboard/community" },
     ] : []),
     ...(userPlan === "premium" ? [
       { name: t('aiCoaching'), icon: SparklesIcon, href: "/dashboard/ai-coaching" },
-      { name: t('oneOnOneCoaching'), icon: AcademicCapIcon, href: "/dashboard/one-on-one" },
-      { name: t('analytics'), icon: BookOpenIcon, href: "/dashboard/analytics" },
     ] : []),
     { name: t('settings'), icon: Cog6ToothIcon, href: "/dashboard/settings" },
   ];

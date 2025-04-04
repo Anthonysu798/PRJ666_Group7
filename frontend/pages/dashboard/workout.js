@@ -18,7 +18,12 @@ import {
   ArrowUpRight,
   Sparkles,
   Clock,
-  Star
+  Star,
+  Play,
+  Pause,
+  Stop,
+  Save,
+  Crown
 } from "lucide-react";
 import WorkoutPlanForm from "@/components/workout/WorkoutPlanForm";
 import WorkoutDetailsModal from "@/components/workout/WorkoutDetailsModal";
@@ -27,6 +32,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { WORKOUT_IMAGES, getRandomWorkoutImage } from "@/utils/workoutImages";
 import { getWorkoutMetrics } from "@/utils/workoutHelpers";
 import { MUSCLE_GROUPS, INTENSITY_LEVELS } from '@/utils/workoutConstants';
+import WorkoutSessionModal from "@/components/workout/WorkoutSessionModal";
+import AIWorkoutForm from '@/components/workout/AIWorkoutForm';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -45,7 +52,12 @@ function Workout() {
   const [activePlanId, setActivePlanId] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [userPlan, setUserPlan] = useState('basic');
+  const [userPlanStatus, setUserPlanStatus] = useState('basic');
+  const [showWorkoutSession, setShowWorkoutSession] = useState(false);
+  const [canCloseSession, setCanCloseSession] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const filterButtons = [
     { id: "all", label: "All Workouts", icon: Scale },
@@ -151,55 +163,48 @@ function Workout() {
     }
   }, []);
 
-  const handleSetActiveWorkout = async (plan) => {
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/profile/getUserProfile`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Set user plan status from profile data
+          setUserPlanStatus(data.user.plan?.toLowerCase() || 'basic');
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        setUserPlanStatus('basic'); // Default to basic if error
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  const handleStartSession = () => {
+    setShowDetailsModal(false);
+    setShowWorkoutSession(true);
+  };
+
+  const handleSetActiveWorkout = (workout) => {
     try {
-      const isPreset = !plan._id;
-
-      const response = await fetch(`${apiUrl}/api/workout/active`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ 
-          planId: plan._id,
-          isPreset: isPreset,
-          presetPlan: isPreset ? plan : undefined
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to set active workout');
-      }
-
-      const data = await response.json();
-      const savedPlan = data.plan;
-
-      // Update local state
-      setActivePlanId(savedPlan._id);
-      setCurrentPlan(savedPlan);
+      // Just update the local state
+      setActivePlanId(workout._id);
+      setCurrentPlan(workout);
       
-      // Update both preset and custom plans lists
-      if (plan.isCustom) {
-        setCustomPlans(prev => prev.map(p => ({
-          ...p,
-          isActive: p._id === savedPlan._id,
-          ...(p._id === savedPlan._id ? savedPlan : {})
-        })));
-      } else {
-        setPresetPlans(prev => prev.map(p => ({
-          ...p,
-          isActive: savedPlan.name === p.name && savedPlan.category === p.category,
-          _id: savedPlan.name === p.name && savedPlan.category === p.category ? savedPlan._id : p._id,
-          ...(p.name === savedPlan.name && p.category === savedPlan.category ? savedPlan : {})
-        })));
-      }
-
-      setToastMessage("Workout plan updated successfully!");
+      // Show success message
+      setToastMessage("Workout set as current plan");
       setShowToast(true);
     } catch (error) {
-      console.error("Error updating workout:", error);
-      setError(error.message || "Failed to update workout");
+      console.error("Error setting active workout:", error);
+      setToastMessage("Failed to set active workout");
+      setShowToast(true);
     }
   };
 
@@ -261,12 +266,203 @@ function Workout() {
     return styles[difficulty] || 'bg-purple-500/20 text-purple-300';
   };
 
+  const getTypeStyle = (type) => {
+    const styles = {
+      'ai-generated': 'bg-purple-500/20 text-purple-300',
+      'preset': 'bg-blue-500/20 text-blue-300',
+      'custom': 'bg-green-500/20 text-green-300'
+    };
+    return styles[type] || styles.custom;
+  };
+
   const handleGenerateWorkout = () => {
-    if (userPlan === 'basic') {
+    if (userPlanStatus === 'basic') {
       setShowUpgradeModal(true);
       return;
     }
-    // Existing generate workout logic
+    setShowAIModal(true);
+  };
+
+  const handleAIFormSubmit = async (formData) => {
+    setIsGenerating(true);
+
+    try {
+      const prompt = `Generate a personalized workout plan with the following details:
+        - Fitness Goal: ${formData.fitnessGoal}
+        - Experience Level: ${formData.experienceLevel}
+        - Time per Workout: ${formData.timePerWorkout} minutes
+        - Days per Week: ${formData.daysPerWeek} days
+        - Available Equipment: ${formData.equipment}
+        - Injuries/Limitations: ${formData.injuries}
+        - Preferences: ${formData.preferences}
+        
+        Respond ONLY with a JSON object in this exact format (no markdown, no backticks, no explanation):
+        {
+          "name": "Plan Name",
+          "description": "Plan Description",
+          "exercises": [
+            {
+              "name": "Exercise Name",
+              "sets": number,
+              "reps": number,
+              "duration": number,
+              "restPeriod": number
+            }
+          ],
+          "weeklySchedule": "Detailed schedule",
+          "progressionPlan": "Progressive overload suggestions"
+        }`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ***REMOVED***`
+        },
+        body: JSON.stringify({
+          model: "gpt-4-turbo-preview",
+          messages: [{
+            role: "user",
+            content: prompt
+          }],
+          temperature: 0.7,
+          response_format: { type: "json_object" } // Force JSON response
+        })
+      });
+
+      const data = await response.json();
+      
+      // Clean and parse the response
+      let aiResponse;
+      try {
+        const content = data.choices[0].message.content;
+        // Remove any markdown formatting if present
+        const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+        aiResponse = JSON.parse(cleanContent);
+      } catch (error) {
+        console.error('Error parsing AI response:', error);
+        throw new Error('Failed to parse AI response');
+      }
+
+      // Validate the response structure
+      if (!aiResponse.exercises || !Array.isArray(aiResponse.exercises) || aiResponse.exercises.length === 0) {
+        throw new Error('Invalid workout plan format from AI');
+      }
+
+      // Save the generated plan
+      const planResponse = await fetch(`${apiUrl}/api/workout/custom`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          name: aiResponse.name || `AI Plan - ${formData.fitnessGoal}`,
+          description: aiResponse.description,
+          type: 'ai-generated',
+          category: formData.fitnessGoal,
+          difficulty: formData.experienceLevel.toLowerCase(),
+          duration: parseInt(formData.timePerWorkout),
+          frequency: parseInt(formData.daysPerWeek),
+          exercises: aiResponse.exercises.map(exercise => ({
+            name: exercise.name,
+            sets: exercise.sets,
+            reps: exercise.reps,
+            duration: exercise.duration || 0,
+            restTime: exercise.restPeriod || 60
+          })),
+          metrics: {
+            intensity: formData.experienceLevel.toLowerCase() === 'beginner' ? 'low' : 
+                       formData.experienceLevel.toLowerCase() === 'intermediate' ? 'medium' : 'high',
+            caloriesBurn: parseInt(formData.timePerWorkout) * 10
+          },
+          tags: ['AI Powered', 'Smart Plan', 'Personalized'],
+          isCustom: true
+        })
+      });
+
+      if (!planResponse.ok) {
+        const errorData = await planResponse.json();
+        throw new Error(errorData.message || 'Failed to save workout plan');
+      }
+
+      const { plan } = await planResponse.json();
+
+      // Update the custom plans state directly
+      setCustomPlans(prevPlans => [...prevPlans, {
+        ...plan,
+        isCustom: true,
+        type: 'ai-generated',
+        image: plan.image || getRandomWorkoutImage(plan.category),
+        isActive: false
+      }]);
+
+      setToastMessage("AI Workout plan generated successfully!");
+      setShowToast(true);
+      setShowAIModal(false);
+
+    } catch (error) {
+      console.error('Error generating workout plan:', error);
+      setToastMessage(error.message || "Failed to generate workout plan");
+      setShowToast(true);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleWorkoutComplete = async (sessionData) => {
+    try {
+      // Validate duration
+      if (typeof sessionData.duration !== 'number' || sessionData.duration <= 0) {
+        throw new Error('Invalid workout duration');
+      }
+
+      const response = await fetch(`${apiUrl}/api/workout/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ duration: sessionData.duration })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to save workout session');
+      }
+
+      setShowWorkoutSession(false);
+      setSelectedPlan(null);
+      setToastMessage("Workout session saved successfully!");
+      setShowToast(true);
+    } catch (error) {
+      console.error("Error saving workout session:", error);
+      setToastMessage(error.message || "Failed to save workout session");
+      setShowToast(true);
+    }
+  };
+
+  // Add new function to fetch user's streak
+  const fetchUserStreak = async () => {
+    try {
+      const response = await fetch(`${apiUrl}/api/workout/streak`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch streak data');
+      }
+
+      const data = await response.json();
+      return data.streak;
+
+    } catch (error) {
+      console.error("Error fetching streak:", error);
+      return null;
+    }
   };
 
   const UpgradeModal = () => (
@@ -321,20 +517,20 @@ function Workout() {
               <button
                 onClick={handleGenerateWorkout}
                 className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2
-                  ${userPlan === 'basic' 
-                    ? 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:opacity-90' 
-                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90'
-                  } text-white transition-all`}
+                  ${userPlanStatus === 'basic' 
+                    ? 'bg-gradient-to-r from-yellow-600 to-amber-600' 
+                    : 'bg-gradient-to-r from-purple-600 to-indigo-600'
+                  } hover:opacity-90 text-white transition-all`}
               >
-                {userPlan === 'basic' ? (
+                {userPlanStatus === 'basic' ? (
                   <>
+                    <Crown className="w-4 h-4" />
                     Upgrade for AI Workouts
-                    <ArrowUpRight className="w-4 h-4" />
                   </>
                 ) : (
                   <>
-                    Generate AI Plan
                     <Sparkles className="w-4 h-4" />
+                    Generate AI Plan
                   </>
                 )}
               </button>
@@ -456,7 +652,7 @@ function Workout() {
                       
                       {/* Badges */}
                       <div className="absolute top-4 left-4 right-4 flex justify-between">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium 
                                         ${getCategoryStyle(plan.category)}`}>
                             {plan.category}
@@ -465,11 +661,17 @@ function Workout() {
                                         ${getDifficultyStyle(plan.difficulty)}`}>
                             {plan.difficulty}
                           </span>
+                          {plan.type === 'ai-generated' && (
+                            <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs font-medium flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              AI Powered
+                            </span>
+                          )}
                         </div>
                         {plan.isActive && (
                           <span className="px-2 py-1 bg-purple-500/20 rounded-full text-purple-300 
-                                       text-xs font-medium flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Active
+                                       text-xs font-medium">
+                            Active Plan
                           </span>
                         )}
                       </div>
@@ -480,7 +682,11 @@ function Workout() {
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-white truncate">{plan.name}</h3>
                         <button
-                          onClick={() => setSelectedPlan(plan)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlan(plan);
+                            setShowDetailsModal(true);
+                          }}
                           className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 
                                    hover:bg-purple-500/20 transition-colors"
                         >
@@ -513,16 +719,18 @@ function Workout() {
                         ))}
                       </div>
 
-                      {/* Action Button */}
+                      {/* Start Workout button */}
                       <button
-                        onClick={() => plan.isActive ? setSelectedPlan(plan) : handleSetActiveWorkout(plan)}
-                        className={`w-full py-2 rounded-lg font-medium transition-colors ${
-                          plan.isActive
-                            ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
-                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90'
-                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPlan(plan);
+                          setShowDetailsModal(true);
+                        }}
+                        className="w-full py-2 rounded-lg font-medium bg-gradient-to-r 
+                                 from-purple-600 to-indigo-600 text-white hover:opacity-90 
+                                 transition-opacity"
                       >
-                        {plan.isActive ? 'View Details' : 'Start Workout'}
+                        Start Session
                       </button>
                     </div>
                   </motion.div>
@@ -531,19 +739,47 @@ function Workout() {
           )}
 
           {/* Modals */}
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {showCustomForm && (
               <WorkoutPlanForm
                 onClose={() => setShowCustomForm(false)}
                 onSubmit={handleCreateCustomPlan}
               />
             )}
-            {selectedPlan && (
+            {showDetailsModal && selectedPlan && (
               <WorkoutDetailsModal
+                key="details-modal"
                 workout={selectedPlan}
-                onClose={() => setSelectedPlan(null)}
+                onClose={() => {
+                  setShowDetailsModal(false);
+                  setSelectedPlan(null);
+                }}
                 onSetCurrent={handleSetActiveWorkout}
                 isCurrentPlan={selectedPlan._id === activePlanId}
+                onStartSession={handleStartSession}
+              />
+            )}
+            {showWorkoutSession && selectedPlan && (
+              <WorkoutSessionModal
+                key="session-modal"
+                workout={selectedPlan}
+                onClose={() => {
+                  if (canCloseSession) {
+                    setShowWorkoutSession(false);
+                    setSelectedPlan(null);
+                    setCanCloseSession(false);
+                  }
+                }}
+                onComplete={handleWorkoutComplete}
+                onSessionStart={() => setCanCloseSession(false)}
+                onSessionEnd={() => setCanCloseSession(true)}
+              />
+            )}
+            {showAIModal && (
+              <AIWorkoutForm 
+                onSubmit={handleAIFormSubmit}
+                onClose={() => setShowAIModal(false)}
+                isGenerating={isGenerating}
               />
             )}
             {showUpgradeModal && <UpgradeModal />}

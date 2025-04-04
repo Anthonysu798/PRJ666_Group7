@@ -14,7 +14,9 @@ const CustomPlanForm = ({ onSubmit, onClose, setCustomPlan }) => {
     tags: [],
     description: '',
     dietaryRestrictions: [],
-    activityLevel: ''
+    activityLevel: '',
+    type: 'custom',
+    isCustom: true
   });
 
   const handleChange = (e) => {
@@ -72,7 +74,15 @@ const CustomPlanForm = ({ onSubmit, onClose, setCustomPlan }) => {
         formData.category,
         formData.activityLevel,
         ...formData.dietaryRestrictions
-      ]
+      ],
+      metrics: {
+        calories: calories,
+        protein: protein,
+        carbs: carbs,
+        fats: fats
+      },
+      type: 'custom',
+      isCustom: true
     };
 
     onSubmit(completePlanData);

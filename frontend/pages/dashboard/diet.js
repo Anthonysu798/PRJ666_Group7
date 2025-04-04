@@ -166,52 +166,36 @@ function Diet() {
 
   const handleCustomPlanSubmit = async (planData) => {
     try {
-      setIsLoading(true);
-      setError(null);
-
-      const usedImages = customPlans.map(plan => plan.image);
-      const randomImage = getRandomImage(usedImages);
-
-      // Add the random image to the plan data
-      const finalPlanData = {
-        ...planData,
-        image: randomImage,
-        isCustom: true // Make sure to set this flag
-      };
-
       const response = await fetch(`${apiUrl}/api/diet/custom`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(finalPlanData)
+        body: JSON.stringify(planData)
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create custom plan: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create custom plan');
       }
 
-      const data = await response.json();
-      
-      // Update both custom plans list and set as current plan
-      const newPlan = data.plan;
-      setCustomPlans(prev => [...prev, newPlan]);
-      setCurrentPlan(newPlan);
-      setActivePlanId(newPlan._id);
+      const { plan } = await response.json();
 
-      // Switch to custom plans tab
-      setActiveTab("custom");
-      
-      setShowCustomForm(false);
-      setToastMessage("Custom plan created successfully!");
+      // Update custom plans state
+      setCustomPlans(prevPlans => [...prevPlans, {
+        ...plan,
+        isCustom: true,
+        image: plan.image || getRandomImage(plan.tags)
+      }]);
+
+      setToastMessage("Custom diet plan created successfully!");
       setShowToast(true);
-
+      setShowCustomForm(false);
     } catch (error) {
-      console.error("Error creating custom plan:", error);
-      setError(error.message || "Failed to create custom plan");
-    } finally {
-      setIsLoading(false);
+      console.error('Error creating custom plan:', error);
+      setToastMessage(error.message || "Failed to create custom plan");
+      setShowToast(true);
     }
   };
 
@@ -668,6 +652,18 @@ function Diet() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* Custom Plan Form Modal */}
+        {showCustomForm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 
+                      flex items-center justify-center p-4">
+            <CustomPlanForm
+              onSubmit={handleCustomPlanSubmit}
+              onClose={() => setShowCustomForm(false)}
+              setCustomPlan={setCustomPlan}
+            />
           </div>
         )}
       </DashboardLayout>
