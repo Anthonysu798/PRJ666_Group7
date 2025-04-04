@@ -31,6 +31,9 @@ import {
 } from "lucide-react";
 import axios from 'axios';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 function Recommendations() {
   const [chatHistory, setChatHistory] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -203,7 +206,7 @@ ${chat.message}
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Authentication required');
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       const response = await axios.post(`${apiUrl}/api/recommendations/chat`, {
         message: userMessage,
         category: activeCategory

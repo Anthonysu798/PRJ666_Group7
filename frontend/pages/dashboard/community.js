@@ -138,10 +138,13 @@ function Community() {
     setIsAIProcessing(true);
     setAiProcessingType(type);
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Authentication required');
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/aipost/enhance-post`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -150,11 +153,12 @@ function Community() {
           category: selectedCategory
         })
       });
-  
+
       if (!response.ok) {
-        throw new Error('Failed to enhance post');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to enhance post');
       }
-  
+
       const data = await response.json();
       
       if (data.success) {
@@ -172,6 +176,7 @@ function Community() {
       }
     } catch (error) {
       console.error('Error enhancing post:', error);
+      // Add user feedback here if needed
     } finally {
       setIsAIProcessing(false);
       setAiProcessingType(null);

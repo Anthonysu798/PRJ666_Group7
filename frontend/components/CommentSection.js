@@ -9,18 +9,29 @@ export default function CommentSection({ post, onComment, isActive }) {
   const [aiSuggestions, setAISuggestions] = useState([]);
 
   const handleSubmitComment = async () => {
+    if (!commentText.trim()) {
+      setCommentMessage('Comment cannot be empty');
+      return;
+    }
+
     try {
-      await onComment(post._id, commentText);
+      const response = await onComment(post._id, commentText);
+      
+      // Check response type
+      if (response.headers?.get('content-type')?.includes('text/html')) {
+        throw new Error('Invalid server response');
+      }
+
       setCommentText('');
       setCommentMessage('Comment added successfully! 🎉');
-      setAISuggestions([]); // Clear suggestions after posting
+      setAISuggestions([]);
       
       setTimeout(() => {
         setCommentMessage('');
       }, 3000);
     } catch (error) {
       console.error('Error submitting comment:', error);
-      setCommentMessage('Failed to add comment. Please try again.');
+      setCommentMessage(error.message || 'Failed to add comment. Please try again.');
     }
   };
 

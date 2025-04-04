@@ -48,6 +48,8 @@ function Diet() {
   const [toastMessage, setToastMessage] = useState("");
   const router = useRouter();
   const [activePlanId, setActivePlanId] = useState(null);
+  const [showAIForm, setShowAIForm] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   // Add these state variables
   const [customPlan, setCustomPlan] = useState({
@@ -266,11 +268,65 @@ function Diet() {
   );
 
   const handleGeneratePlan = () => {
-    if (userPlan === 'basic') {
+    // Debug log to check plan status when button is clicked
+    console.log('Current user plan when generating:', userPlan);
+    
+    if (!['premium', 'standard'].includes(userPlan.toLowerCase())) {
       setShowUpgradeModal(true);
       return;
     }
-    // Existing generate plan logic
+    setShowAIForm(true);
+  };
+
+  const handleAIDietPlanSubmit = async (formData) => {
+    try {
+      setIsGeneratingAI(true);
+      const token = localStorage.getItem("token");
+      
+      const response = await fetch(`${apiUrl}/api/diet/ai-generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      // First check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to generate AI diet plan');
+        } else {
+          const errorText = await response.text();
+          console.error('Server response:', errorText);
+          throw new Error('Server error occurred');
+        }
+      }
+
+      const data = await response.json();
+
+      setCustomPlans(prevPlans => [
+        ...prevPlans,
+        {
+          ...data.plan,
+          isCustom: true,
+          type: 'ai-generated',
+          image: data.plan.image || getRandomImage(data.plan.category)
+        }
+      ]);
+
+      setToastMessage("AI diet plan generated successfully!");
+      setShowToast(true);
+      setShowAIForm(false);
+    } catch (error) {
+      console.error('Error generating AI plan:', error);
+      setError(error.message);
+      setShowToast(true);
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   const UpgradeModal = () => (
