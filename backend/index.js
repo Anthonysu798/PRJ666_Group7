@@ -13,6 +13,10 @@ import { User } from "./models/user.model.js";
 import dietRoutes from './routes/diet.route.js';
 import mongoose from 'mongoose';
 import workoutRoutes from "./routes/workout.routes.js";
+import aiRecommendationRoutes from './routes/airecommendation.routes.js';
+import communityRoutes from './routes/community.route.js';
+import aiPostRoutes from './routes/aipost.routes.js';
+import analyzeFormRoutes from './routes/analyze-form.routes.js';
 
 dotenv.config(); // Load environment variables
 
@@ -96,9 +100,10 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
 });
 
 // Regular middleware
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
-  origin: apiUrl,  
+  origin: process.env.FRONTEND_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -126,7 +131,10 @@ app.use('/api/user', userStatsRoutes); // User stats routes
 app.use('/api/public', publicRouter);
 app.use('/api/stripe', stripeRouter); // Stripe routes
 app.use("/api/workout", workoutRoutes); // Workout routes
-
+app.use('/api', aiRecommendationRoutes); // Add AI recommendation routes
+app.use('/api/community', communityRoutes);
+app.use('/api/aipost', aiPostRoutes); // AI Post enhancement routes
+app.use('/api/analyze-form', analyzeFormRoutes);  // Mount analyze-form routes
 
 // Start server
 const PORT = process.env.PORT || 4000;

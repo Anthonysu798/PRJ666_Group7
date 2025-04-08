@@ -1,6 +1,7 @@
 import express from 'express';
 import { getPresetPlans, getUserPlans, createCustomPlan, setActivePlan, updatePlan } from '../controllers/diet.controllers.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { generateAIDietPlan } from '../controllers/dietAI.controller.js';
 
 const router = express.Router();
 
@@ -9,6 +10,7 @@ router.get('/user-plans', protect, getUserPlans);
 router.post('/custom', protect, createCustomPlan);
 router.post('/active', protect, setActivePlan);
 router.put('/update-plan/:planId', protect, updatePlan);
+router.post('/ai-generate', protect, generateAIDietPlan);
 
 // Add error handling middleware
 router.use((err, req, res, next) => {

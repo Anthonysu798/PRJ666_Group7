@@ -83,3 +83,52 @@ export const chatWithAI = async (req, res) => {
         });
     }
 };
+
+export const enhancePost = async (req, res) => {
+  try {
+    const { content, type, category } = req.body;
+
+    if (!content || !type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Content and type are required'
+      });
+    }
+
+    let response;
+    switch (type) {
+      case 'format':
+        response = {
+          success: true,
+          enhancedContent: content // Add your AI formatting logic here
+        };
+        break;
+      case 'suggestions':
+        response = {
+          success: true,
+          suggestions: [
+            "Here's a suggestion...",
+            "Another suggestion...",
+            "One more idea..."
+          ] // Add your AI suggestion logic here
+        };
+        break;
+      case 'hashtags':
+        response = {
+          success: true,
+          hashtags: ['#fitness', '#health', '#wellness'] // Add your hashtag generation logic here
+        };
+        break;
+      default:
+        throw new Error('Invalid enhancement type');
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error enhancing post:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to enhance post'
+    });
+  }
+};
